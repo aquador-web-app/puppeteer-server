@@ -2,10 +2,10 @@
   "name": "puppeteer-server",
   "version": "1.0.0",
   "type": "module",
-  "main": "server.js",
+  "main": "puppeteer-server.js",
   "dependencies": {
-    "body-parser": "^2.2.0",
     "express": "^4.21.2",
-    "puppeteer": "^24.25.0"
+    "@sparticuz/chromium": "^117.0.0",
+    "puppeteer-core": "^21.3.8"
   }
 }
