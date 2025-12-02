@@ -1,70 +1,71 @@
-// puppeteer-server.js
 import express from "express";
-import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
+import bodyParser from "body-parser";
+import puppeteer from "puppeteer";
 
 const app = express();
-app.use(express.json());
+app.use(bodyParser.json({ limit: "20mb" }));
 
-// Allow HTTPS fetches to self-signed Supabase URLs
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
-// Required for Render
-chromium.setHeadlessMode = true;
-chromium.setGraphicsMode = false;
-
-app.post("/pdf", async (req, res) => {
-  const { url, options = {} } = req.body;
-  if (!url) return res.status(400).send("Missing URL");
-
-  try {
-    console.log("📥 Rendering invoice from URL:", url);
-
-    // ==========================================
-    // 🚀 LAUNCH BROWSER USING CHROMIUM ON RENDER
-    // ==========================================
-    const browser = await puppeteer.launch({
-      headless: chromium.headless,
-      executablePath: await chromium.executablePath(),
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+// ------- Launch Browser Once -------
+let browserPromise = null;
+async function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-zygote",
+        "--single-process",
+      ],
     });
+  }
+  return browserPromise;
+}
 
+// ------- HEALTH CHECK -------
+app.get("/", (req, res) => {
+  res.send("Puppeteer server is running 🚀");
+});
+
+// ------- /pdf ROUTE -------
+app.post("/pdf", async (req, res) => {
+  try {
+    const { url, html, options = {} } = req.body;
+
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
-    // Fetch raw HTML
-    console.log("📡 Fetching HTML from Supabase...");
-    const response = await fetch(url);
-    const html = await response.text();
+    // Prefer HTML → fallback to URL
+    if (html) {
+      await page.setContent(html, { waitUntil: "networkidle0" });
+    } else if (url) {
+      await page.goto(url, { waitUntil: "networkidle0" });
+    } else {
+      return res.status(400).send("Missing url or html");
+    }
 
-    await page.setContent(html, { waitUntil: "load", timeout: 0 });
-
-    // Merge PDF options
-    const pdfOptions = {
+    const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 },
       ...options,
-    };
+    });
 
-    console.log("🖨️ Generating PDF...");
-    const pdfBuffer = await page.pdf(pdfOptions);
+    await page.close();
 
-    await browser.close();
-
-    console.log("✅ PDF generated successfully!");
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "inline; filename=invoice.pdf");
-    res.end(pdfBuffer);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Length": pdfBuffer.length,
+    });
+    return res.send(pdfBuffer);
 
   } catch (err) {
-    console.error("❌ Puppeteer render error:", err);
-    res.status(500).send(err.message);
+    console.error("🔥 Puppeteer error:", err);
+    return res.status(500).send("Puppeteer failed: " + err.message);
   }
 });
 
+// ------- START SERVER -------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`🚀 Puppeteer PDF server running on port ${PORT}`)
-);
+app.listen(PORT, () => console.log(`🚀 Puppeteer server on :${PORT}`));
