@@ -3,6 +3,10 @@ import bodyParser from "body-parser";
 import puppeteer from "puppeteer-core";
 import { executablePath } from "puppeteer";
 
+process.env.PUPPETEER_CACHE_DIR = "/opt/render/.cache/puppeteer";
+process.env.PUPPETEER_CACHE_PATH = "/opt/render/.cache/puppeteer";
+process.env.PUPPETEER_CHROMIUM_REVISION = "latest";
+
 const app = express();
 app.use(bodyParser.json({ limit: "20mb" }));
 
@@ -17,8 +21,21 @@ async function getBrowser() {
 
     browserPromise = puppeteer.launch({
       headless: "new",
-      executablePath: chromePath,   // 👈 critical
-      protocolTimeout: 120000, 
+
+      // 👇👇👇 IMPORTANT — keep your chromePath
+      executablePath: chromePath,
+
+      /* -------------------------------------------
+         ✅ ADD THIS — Forces browser to always use
+            the real Render cache directory
+      --------------------------------------------*/
+      cacheDirectory: "/opt/render/.cache/puppeteer",
+
+      /* -------------------------------------------
+         ✅ ADD THIS — Fix “Network.enable timed out”
+      --------------------------------------------*/
+      protocolTimeout: 120000,
+
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
