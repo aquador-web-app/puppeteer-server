@@ -3,9 +3,25 @@ import bodyParser from "body-parser";
 
 import puppeteer from "puppeteer-core";
 import { executablePath } from "puppeteer";
+import fs from "fs";
+import path from "path";
 
 const app = express();
 app.use(bodyParser.json({ limit: "20mb" }));
+
+// -----------------------
+//  FIND CHROME IN RENDER
+// -----------------------
+function findChrome() {
+  const base = "/opt/render/.cache/puppeteer/chrome";
+  if (!fs.existsSync(base)) return null;
+
+  for (const folder of fs.readdirSync(base)) {
+    const full = path.join(base, folder, "chrome-linux64", "chrome");
+    if (fs.existsSync(full)) return full;
+  }
+  return null;
+}
 
 // -----------------------
 //  LAUNCH BROWSER (ONE TIME ONLY)
@@ -15,8 +31,8 @@ let browserPromise = null;
 async function launchBrowser() {
   if (browserPromise) return browserPromise;
 
-  const chromePath = executablePath();
-  console.log("Launching Chromium at:", chromePath);
+  const chromePath = findChrome() || executablePath();
+console.log("🔥 Chromium path detected:", chromePath);
 
   browserPromise = puppeteer.launch({
     headless: "new",
