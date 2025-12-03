@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: puppeteer-server
+    env: node
+    buildCommand: npm install
+    startCommand: |
+      echo "Installing Chrome..."
+      npx puppeteer browsers install chrome
+      ls -R /opt/render/.cache/puppeteer || true
+      echo "Starting server..."
+      node server.js
