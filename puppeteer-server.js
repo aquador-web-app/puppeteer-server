@@ -30,10 +30,16 @@ async function launchBrowser() {
     cacheDirectory: "/opt/render/.cache/puppeteer",
     args: [
       "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-zygote",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--single-process",
+    "--no-zygote",
+    "--no-first-run",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--allow-running-insecure-content",
     ],
   });
 
