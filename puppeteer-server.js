@@ -1,6 +1,6 @@
 import express from "express";
 import bodyParser from "body-parser";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
 
 const app = express();
 app.use(bodyParser.json({ limit: "20mb" }));
@@ -11,18 +11,18 @@ async function getBrowser() {
   if (!browserPromise) {
     browserPromise = puppeteer.launch({
       headless: "new",
+      executablePath: "/usr/bin/google-chrome",    // ⭐ built-in Render Chrome
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
-        "--no-zygote",
-        "--single-process",
       ],
     });
   }
   return browserPromise;
 }
+
 
 // ------- HEALTH CHECK -------
 app.get("/", (req, res) => {
