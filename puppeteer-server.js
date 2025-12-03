@@ -1,5 +1,3 @@
-UPDATE THIS
-
 import express from "express";
 import bodyParser from "body-parser";
 import puppeteer from "puppeteer-core";
