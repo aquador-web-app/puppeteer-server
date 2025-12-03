@@ -10,62 +10,82 @@ process.env.PUPPETEER_CHROMIUM_REVISION = "latest";
 const app = express();
 app.use(bodyParser.json({ limit: "20mb" }));
 
-// ------- Launch Browser Once -------
-let browserPromise = null;
+// -------------------------------
+// 🔥 MEMORY-SAFE BROWSER LOGIC
+// -------------------------------
+let browser = null;
+let pdfCount = 0;
 
-async function getBrowser() {
-  if (!browserPromise) {
-    const chromePath = executablePath(); // 👈 Puppeteer’s downloaded Chromium
+async function launchBrowser() {
+  if (browser) return browser;
 
-    console.log("Using Chromium at:", chromePath);
+  const chromePath = executablePath();
 
-    browserPromise = puppeteer.launch({
-      headless: "new",
+  console.log("Launching Chromium at:", chromePath);
 
-      // 👇👇👇 IMPORTANT — keep your chromePath
-      executablePath: chromePath,
+  browser = await puppeteer.launch({
+    headless: "new",
+    executablePath: chromePath,
+    protocolTimeout: 120000,
+    cacheDirectory: "/opt/render/.cache/puppeteer",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--no-zygote",
+    ],
+  });
 
-      /* -------------------------------------------
-         ✅ ADD THIS — Forces browser to always use
-            the real Render cache directory
-      --------------------------------------------*/
-      cacheDirectory: "/opt/render/.cache/puppeteer",
-
-      /* -------------------------------------------
-         ✅ ADD THIS — Fix “Network.enable timed out”
-      --------------------------------------------*/
-      protocolTimeout: 120000,
-
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-zygote",
-      ],
-    });
-  }
-  return browserPromise;
+  return browser;
 }
 
-// ------- HEALTH CHECK -------
-app.get("/", (req, res) => {
-  res.send("Puppeteer server is running 🚀");
-});
+// Restart browser every 25 PDFs to prevent RAM leak
+async function maybeRestartBrowser() {
+  pdfCount++;
+  if (pdfCount >= 25) {
+    console.log("♻️ Restarting Chrome to free memory...");
+    try {
+      await browser.close();
+    } catch (_) {}
+    browser = null;
+    pdfCount = 0;
+  }
+}
 
-// ------- /pdf ROUTE -------
+// -------------------------------
+// HEALTH CHECK
+// -------------------------------
+app.get("/", (req, res) =>
+  res.send("Puppeteer server running 🚀 (memory-safe)")
+);
+
+// -------------------------------
+// /pdf ROUTE
+// -------------------------------
 app.post("/pdf", async (req, res) => {
+  const timeoutMs = 90000; // hard kill after 90s
+
+  const timer = setTimeout(() => {
+    console.error("⏳ HARD TIMEOUT — killing request");
+    return res.status(504).send("Timeout when generating PDF");
+  }, timeoutMs);
+
   try {
     const { url, html, options = {} } = req.body;
 
-    const browser = await getBrowser();
+    const browser = await launchBrowser();
     const page = await browser.newPage();
+
+    // Prevent memory leaks from large console logs
+    page.on("console", () => {});
 
     if (html) {
       await page.setContent(html, { waitUntil: "networkidle0" });
     } else if (url) {
       await page.goto(url, { waitUntil: "networkidle0" });
     } else {
+      clearTimeout(timer);
       return res.status(400).send("Missing url or html");
     }
 
@@ -75,22 +95,27 @@ app.post("/pdf", async (req, res) => {
       ...options,
     });
 
-    await page.close();
+    await page.close().catch(() => {}); // avoid zombie pages
+
+    clearTimeout(timer);
 
     res.set({
       "Content-Type": "application/pdf",
       "Content-Length": pdfBuffer.length,
     });
-    return res.send(pdfBuffer);
 
+    await maybeRestartBrowser(); // <-- MEMORY SAVER
+
+    return res.send(pdfBuffer);
   } catch (err) {
+    clearTimeout(timer);
     console.error("🔥 Puppeteer error:", err);
     return res.status(500).send("Puppeteer failed: " + err.message);
   }
 });
 
-// ------- START SERVER -------
+// -------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
-  console.log(`🚀 Puppeteer server running on port ${PORT}`)
+  console.log(`🚀 Puppeteer server (memory-safe) on port ${PORT}`)
 );
