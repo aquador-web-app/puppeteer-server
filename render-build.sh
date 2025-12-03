@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-echo "⚡ Installing Chromium..."
-apt-get update
-apt-get install -y chromium-browser chromium-common chromium-codecs-ffmpeg
-
-echo "⚡ Installing Node dependencies..."
+echo "📦 Installing dependencies..."
 npm install
+
+echo "🧩 Installing Chromium via Puppeteer..."
+npx puppeteer browsers install chrome
+
+echo "🔍 Verify Chromium install:"
+ls -R /opt/render/.cache/puppeteer || true
+
+echo "✅ Build complete!"
