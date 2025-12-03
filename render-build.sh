@@ -4,8 +4,8 @@ set -e
 echo "📦 Installing dependencies..."
 npm install
 
-echo "🧩 Installing Chromium via Puppeteer..."
-npx puppeteer browsers install chrome
+echo "🧩 Installing EXACT Chromium version required by puppeteer-core..."
+npx puppeteer browsers install chrome@127.0.6533.88
 
 echo "🔍 Verify Chromium install:"
 ls -R /opt/render/.cache/puppeteer || true
