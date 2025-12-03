@@ -17,13 +17,15 @@ async function getBrowser() {
 
     browserPromise = puppeteer.launch({
       headless: "new",
-      executablePath: chromePath,   // 👈 critical
+      executablePath: chromePath, // 👈 critical
+      protocolTimeout: 120000,    // ⬅️ FIXED — prevents Network.enable timeout
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--no-zygote",
+        "--single-process",
       ],
     });
   }
@@ -42,6 +44,10 @@ app.post("/pdf", async (req, res) => {
 
     const browser = await getBrowser();
     const page = await browser.newPage();
+
+    // ⬅️ NEW: Prevent Cloudflare 500 by increasing timeout survival
+    page.setDefaultTimeout(120000);
+    page.setDefaultNavigationTimeout(120000);
 
     if (html) {
       await page.setContent(html, { waitUntil: "networkidle0" });
@@ -63,6 +69,7 @@ app.post("/pdf", async (req, res) => {
       "Content-Type": "application/pdf",
       "Content-Length": pdfBuffer.length,
     });
+
     return res.send(pdfBuffer);
 
   } catch (err) {
