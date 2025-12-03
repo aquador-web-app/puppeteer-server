@@ -1,8 +1,7 @@
 import express from "express";
 import bodyParser from "body-parser";
 
-import puppeteer from "puppeteer-core";
-import { executablePath } from "puppeteer";
+import puppeteer from "puppeteer"; // ✅ ONLY puppeteer, not puppeteer-core
 import fs from "fs";
 import path from "path";
 
@@ -17,63 +16,42 @@ function findChrome() {
   if (!fs.existsSync(base)) return null;
 
   for (const folder of fs.readdirSync(base)) {
-    const full = path.join(base, folder, "chrome-linux64", "chrome");
-    if (fs.existsSync(full)) return full;
+    const chromePath = path.join(base, folder, "chrome-linux64", "chrome");
+    if (fs.existsSync(chromePath)) return chromePath;
   }
   return null;
 }
 
 // -----------------------
-//  LAUNCH BROWSER (ONE TIME ONLY)
+//  LAUNCH BROWSER (ONCE)
 // -----------------------
 let browserPromise = null;
 
 async function launchBrowser() {
   if (browserPromise) return browserPromise;
 
-  const chromePath = findChrome() || executablePath();
-console.log("🔥 Chromium path detected:", chromePath);
+  const chromePath = findChrome();
+  if (!chromePath) {
+    throw new Error("Chrome NOT FOUND on Render. Did postinstall run?");
+  }
+
+  console.log("🔥 Chrome path:", chromePath);
 
   browserPromise = puppeteer.launch({
-    headless: "new",
+    headless: true,
     executablePath: chromePath,
-    protocolTimeout: 120000, // 2 minutes
-    pipe: true, // more stable than websocket
-    ignoreHTTPSErrors: true,
-    defaultViewport: { width: 1280, height: 800 },
+    protocolTimeout: 120000,
     args: [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--disable-dev-shm-usage",
-  "--disable-gpu",
-  "--disable-extensions",
-  "--no-first-run",
-  "--no-zygote",
-  "--mute-audio",
-  "--disable-breakpad",
-  "--disable-client-side-phishing-detection",
-  "--disable-component-update",
-  "--disable-default-apps",
-  "--disable-domain-reliability",
-  "--disable-features=AudioServiceOutOfProcess",
-  "--disable-hang-monitor",
-  "--disable-ipc-flooding-protection",
-  "--disable-popup-blocking",
-  "--disable-prompt-on-repost",
-  "--disable-renderer-backgrounding",
-  "--force-color-profile=srgb",
-  "--metrics-recording-only",
-  "--password-store=basic",
-  "--use-mock-keychain",
-  "--disable-background-networking",
-
-  // IMPORTANT FIXES ⬇️⬇️⬇️
-  "--no-sandbox",
-  "--enable-features=NetworkService,NetworkServiceInProcess",
-  "--font-render-hinting=medium",
-  "--disable-backgrounding-occluded-windows",
-  "--disable-back-forward-cache",
-],
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-extensions",
+      "--no-zygote",
+      "--no-first-run",
+      "--mute-audio",
+      "--disable-breakpad",
+    ],
   });
 
   return browserPromise;
@@ -96,7 +74,6 @@ app.post("/pdf", async (req, res) => {
     const browser = await launchBrowser();
     const page = await browser.newPage();
 
-    // Extra stability: prevent Chrome crash
     await page.setBypassCSP(true);
 
     if (html) {
@@ -119,6 +96,7 @@ app.post("/pdf", async (req, res) => {
       "Content-Type": "application/pdf",
       "Content-Length": pdfBuffer.length,
     });
+
     return res.send(pdfBuffer);
 
   } catch (err) {
@@ -132,5 +110,5 @@ app.post("/pdf", async (req, res) => {
 // -----------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
-  console.log(`🚀 Puppeteer server (Render-safe) running on port ${PORT}`)
+  console.log(`🚀 Puppeteer server running on port ${PORT}`)
 );
