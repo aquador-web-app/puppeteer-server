@@ -1,28 +1,34 @@
 import express from "express";
 import bodyParser from "body-parser";
 import puppeteer from "puppeteer-core";
+import { executablePath } from "puppeteer";
 
 const app = express();
 app.use(bodyParser.json({ limit: "20mb" }));
 
 // ------- Launch Browser Once -------
 let browserPromise = null;
+
 async function getBrowser() {
   if (!browserPromise) {
+    const chromePath = executablePath(); // 👈 Puppeteer’s downloaded Chromium
+
+    console.log("Using Chromium at:", chromePath);
+
     browserPromise = puppeteer.launch({
       headless: "new",
-      executablePath: "/usr/bin/google-chrome",    // ⭐ built-in Render Chrome
+      executablePath: chromePath,   // 👈 critical
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
+        "--no-zygote",
       ],
     });
   }
   return browserPromise;
 }
-
 
 // ------- HEALTH CHECK -------
 app.get("/", (req, res) => {
@@ -37,7 +43,6 @@ app.post("/pdf", async (req, res) => {
     const browser = await getBrowser();
     const page = await browser.newPage();
 
-    // Prefer HTML → fallback to URL
     if (html) {
       await page.setContent(html, { waitUntil: "networkidle0" });
     } else if (url) {
@@ -68,4 +73,6 @@ app.post("/pdf", async (req, res) => {
 
 // ------- START SERVER -------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Puppeteer server on :${PORT}`));
+app.listen(PORT, () =>
+  console.log(`🚀 Puppeteer server running on port ${PORT}`)
+);
