@@ -3,14 +3,18 @@ services:
     name: puppeteer-server
     env: node
     plan: starter
-    healthCheckPath: /
     autoDeploy: true
+    healthCheckPath: /
 
-    buildCommand: ./render-build.sh
+    buildCommand: |
+      echo "📦 Installing dependencies only..."
+      npm install
 
     startCommand: |
       echo "🌐 Installing Chrome at runtime..."
       npx puppeteer browsers install chrome
+
+      echo "📁 Chrome installed — Listing directory:"
       ls -R /opt/render/.cache/puppeteer || true
 
       echo "🚀 Starting Puppeteer server..."
