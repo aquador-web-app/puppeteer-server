@@ -30,32 +30,22 @@ let browserPromise = null;
 async function launchBrowser() {
   if (browserPromise) return browserPromise;
 
-  const chromePath = findChrome();
-  if (!chromePath) {
-    throw new Error("Chrome NOT FOUND on Render. Did postinstall run?");
+  const wsEndpoint = process.env.BROWSERLESS_WS;
+
+  if (!wsEndpoint) {
+    throw new Error("BROWSERLESS_WS is not set");
   }
 
-  console.log("🔥 Chrome path:", chromePath);
+  console.log("🌐 Connecting to Browserless…");
 
-  browserPromise = puppeteer.launch({
-    headless: true,
-    executablePath: chromePath,
+  browserPromise = puppeteer.connect({
+    browserWSEndpoint: wsEndpoint,
     protocolTimeout: 120000,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-extensions",
-      "--no-zygote",
-      "--no-first-run",
-      "--mute-audio",
-      "--disable-breakpad",
-    ],
   });
 
   return browserPromise;
 }
+
 
 // -----------------------
 //  HEALTH CHECK
