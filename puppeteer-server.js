@@ -25,11 +25,8 @@ function findChrome() {
 // -----------------------
 //  LAUNCH BROWSER (ONCE)
 // -----------------------
-let browserPromise = null;
 
 async function launchBrowser() {
-  if (browserPromise) return browserPromise;
-
   const wsEndpoint = process.env.BROWSERLESS_WS;
 
   if (!wsEndpoint) {
@@ -38,13 +35,12 @@ async function launchBrowser() {
 
   console.log("🌐 Connecting to Browserless…");
 
-  browserPromise = puppeteer.connect({
+  return await puppeteer.connect({
     browserWSEndpoint: wsEndpoint,
     protocolTimeout: 120000,
   });
-
-  return browserPromise;
 }
+
 
 
 // -----------------------
@@ -82,6 +78,8 @@ app.post("/pdf", async (req, res) => {
     });
 
     await page.close();
+    await browser.close();
+
 
     res.set({
       "Content-Type": "application/pdf",
