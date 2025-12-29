@@ -75,11 +75,12 @@ app.post("/pdf", async (req, res) => {
     const page = await browser.newPage();
 
     await page.setBypassCSP(true);
+    await page.setJavaScriptEnabled(false); // 🔑 TEST: disable JS
 
     if (html) {
-      await page.setContent(html, { waitUntil: "networkidle0" });
+      await page.setContent(html, { waitUntil: "load" });
     } else if (url) {
-      await page.goto(url, { waitUntil: "networkidle0" });
+      await page.goto(url, { waitUntil: "load" }); // 🔑 CHANGE HERE
     } else {
       return res.status(400).send("Missing url or html");
     }
@@ -104,6 +105,7 @@ app.post("/pdf", async (req, res) => {
     return res.status(500).send("Puppeteer failed: " + err.message);
   }
 });
+
 
 // -----------------------
 //  START SERVER
