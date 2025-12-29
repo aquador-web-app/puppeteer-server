@@ -2,25 +2,10 @@ import express from "express";
 import bodyParser from "body-parser";
 
 import puppeteer from "puppeteer"; // ✅ ONLY puppeteer, not puppeteer-core
-import fs from "fs";
-import path from "path";
 
 const app = express();
 app.use(bodyParser.json({ limit: "20mb" }));
 
-// -----------------------
-//  FIND CHROME IN RENDER
-// -----------------------
-function findChrome() {
-  const base = "/opt/render/.cache/puppeteer/chrome";
-  if (!fs.existsSync(base)) return null;
-
-  for (const folder of fs.readdirSync(base)) {
-    const chromePath = path.join(base, folder, "chrome-linux64", "chrome");
-    if (fs.existsSync(chromePath)) return chromePath;
-  }
-  return null;
-}
 
 // -----------------------
 //  LAUNCH BROWSER (ONCE)
@@ -54,19 +39,22 @@ app.get("/", (req, res) => {
 //  PDF ROUTE
 // -----------------------
 app.post("/pdf", async (req, res) => {
+  let browser;
+  let page;
+
   try {
     const { url, html, options = {} } = req.body;
 
-    const browser = await launchBrowser();
-    const page = await browser.newPage();
+    browser = await launchBrowser();
+    page = await browser.newPage();
 
     await page.setBypassCSP(true);
-    await page.setJavaScriptEnabled(false); // 🔑 TEST: disable JS
+    await page.setJavaScriptEnabled(false);
 
     if (html) {
       await page.setContent(html, { waitUntil: "load" });
     } else if (url) {
-      await page.goto(url, { waitUntil: "load" }); // 🔑 CHANGE HERE
+      await page.goto(url, { waitUntil: "load" });
     } else {
       return res.status(400).send("Missing url or html");
     }
@@ -76,10 +64,6 @@ app.post("/pdf", async (req, res) => {
       printBackground: true,
       ...options,
     });
-
-    await page.close();
-    await browser.close();
-
 
     res.set({
       "Content-Type": "application/pdf",
@@ -91,8 +75,12 @@ app.post("/pdf", async (req, res) => {
   } catch (err) {
     console.error("🔥 Puppeteer error:", err);
     return res.status(500).send("Puppeteer failed: " + err.message);
+  } finally {
+    if (page) await page.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
   }
 });
+
 
 
 // -----------------------
